@@ -28,16 +28,17 @@ Ticker timer_dht;
 
 float h, t;
 bool OTA_flag = 0, dht_Ticker_flag = 0, sgp30_Ticker_flag = 0;
-;
+
 int cnt = 0;
 uint16_t TVOC_base, eCO2_base;
 
-BlinkerNumber Number1("num-i3n");
+
 BlinkerButton Button_OTA("btn-ota");
 
 BlinkerNumber HUMI("humi");
 BlinkerNumber TEMP("temp");
 BlinkerNumber TVOC("tvoc");
+BlinkerNumber ECO2("eco2");
 
 uint32_t getAbsoluteHumidity(float temperature, float humidity);
 void dht_task();
@@ -46,12 +47,14 @@ void sgp30_task();
 void miotQuery(int32_t queryCode);
 void dataRead(const String &data);
 void button_ota_callback(const String &state);
+void dataStorage();
 
-void heartbeat()
-{
-  HUMI.print(h);
-  TEMP.print(t);
-}
+
+// void heartbeat()
+// {
+//   HUMI.print(h);
+//   TEMP.print(t);
+// }
 void dht_Ticker()
 {
   dht_Ticker_flag = 1;
@@ -96,9 +99,9 @@ void setup()
     return;
   }
 
-  const char *ssid = doc["ssid"];           
-  const char *wlan_pswd = doc["wlan_pswd"];  
-  const char *blink_auth = doc["blink_auth"]; 
+  const char *ssid = doc["ssid"];
+  const char *wlan_pswd = doc["wlan_pswd"];
+  const char *blink_auth = doc["blink_auth"];
   Serial.println("OK");
 
   // WiFi.begin(ssid, wlan_pswd);                  // 启动网络连接
@@ -107,7 +110,7 @@ void setup()
 
   Serial.printf(" Wlan Connecting to %s ...\n", ssid); // 串口监视器输出网络连接信息
 
-  for (int i = 0; WiFi.status() != WL_CONNECTED;)  // 如果WiFi连接成功则WiFi.status()返回WL_CONNECTED
+  for (int i = 0; WiFi.status() != WL_CONNECTED;) // 如果WiFi连接成功则WiFi.status()返回WL_CONNECTED
   {
     Serial.printf("%d  ", i++);
     delay(1000);
@@ -195,12 +198,16 @@ void setup()
   cnt = 0;
   Serial.println("SGP30 initial Complete");
   Serial.println(Blinker.init());
-  Blinker.attachData(dataRead);
-  BlinkerMIOT.attachQuery(miotQuery);
-  Button_OTA.attach(button_ota_callback);
-
   timer_dht.attach(2, dht_Ticker);
   timer_sgp30.attach(1, sgp30_Ticker);
+
+  // Blinker.attachData(dataRead);
+  BlinkerMIOT.attachQuery(miotQuery);
+  Button_OTA.attach(button_ota_callback);
+  Button_OTA.text("OTA关闭");
+  Button_OTA.print("off");
+  // Blinker.attachHeartbeat(heartbeat);
+  Blinker.attachDataStorage(dataStorage);
 }
 
 void loop()
@@ -229,6 +236,8 @@ void dht_task()
   t = dht.readTemperature();
   Serial.printf("相对湿度:%4.1f%%\t温度:%4.1f℃\n", h, t);
   sgp.setHumidity(getAbsoluteHumidity(t, h));
+  HUMI.print(h);
+  TEMP.print(t);
 }
 void sgp30_task()
 {
@@ -238,7 +247,9 @@ void sgp30_task()
     return;
   }
   Serial.printf("TVOC %d ppb\t", sgp.TVOC);
+  TVOC.print(sgp.TVOC);
   Serial.printf("eCO2 %d ppm\n", sgp.eCO2);
+  ECO2.print(sgp.eCO2);
   cnt++;
   if (cnt > 30)
   {
@@ -294,17 +305,23 @@ void miotQuery(int32_t queryCode)
   }
 }
 
-void dataRead(const String &data)
+void dataStorage()
 {
-  BLINKER_LOG("Blinker readString: ", data);
-
-  Blinker.vibrate();
-
-  uint32_t BlinkerTime = millis();
-
-  Blinker.print("millis", BlinkerTime);
-  Number1.print(h);
+    Blinker.dataStorage("eco2", sgp.eCO2);
+    Blinker.dataStorage("tvoc", sgp.TVOC);
 }
+
+// void dataRead(const String &data)
+// {
+//   BLINKER_LOG("Blinker readString: ", data);
+
+//   Blinker.vibrate();
+
+//   uint32_t BlinkerTime = millis();
+
+//   Blinker.print("millis", BlinkerTime);
+//   Number1.print(h);
+// }
 void button_ota_callback(const String &state)
 {
   BLINKER_LOG("get button state: ", state);
